@@ -1,0 +1,72 @@
+#!/bin/sh
+
+D=$1
+echo "Running on '$D'"
+
+MODEL_NAME=`echo $D | sed 's%/%_%g' | sed 's/_$//' | sed 's/^models[^_]*_//'`
+echo "Model name: '$MODEL_NAME'"
+
+EXEC_FUNCTION=`grep define "$D"/*.parse.ll | grep -o '[^"]*wrap_exec_[^s][^"]*'`
+echo "Execute function: $EXEC_FUNCTION"
+
+RUN_FUNCTION=`grep define "$D"/*.parse.ll | grep -o '[^"]*wrap_run[^"]*'`
+echo "Run function: $RUN_FUNCTION"
+
+EXEC_SIM_FUNCTION=`grep define "$D"/*.parse.ll | grep -o '[^"]*wrap_exec_simulation[^"]*'`
+echo "Execute simulation function: $EXEC_SIM_FUNCTION"
+
+RUN_SIM_FUNCTION=`grep define "$D"/*.parse.ll | grep -o '[^"]*wrap_simulation_run[^"]*'`
+echo "Run simulation function: $RUN_SIM_FUNCTION"
+
+EVALUATE_FUNCTION=`grep define "$D"/*.parse.ll | grep -o '[^"]*eval[^"]*'`
+echo "Evaluate function: $EVALUATE_FUNCTION"
+
+if [ "x$LLVM_PREFIX" == "x" ]; then
+	LLVM_PREFIX='@LLVM_BINARY_DIR@'
+fi
+
+LLVM_LINK=$LLVM_PREFIX/bin/llvm-link
+LLVM_OPT=$LLVM_PREFIX/bin/opt
+
+# Link all .parse.ll files.
+# Internalize and eliminate all but exec_*.
+$LLVM_LINK "$D"/*.parse.ll | $LLVM_OPT -internalize -internalize-public-api-list=$EXEC_FUNCTION,$RUN_FUNCTION,$EXEC_SIM_FUNCTION,$RUN_SIM_FUNCTION,$EVALUATE_FUNCTION -globaldce -stats -S -o "$MODEL_NAME.ll"
+
+# Create a backup before applying restrictions
+cp $MODEL_NAME.ll $MODEL_NAME.pre-restrict.ll
+
+if [ "x$RUN_FUNCTION" != "x" ]; then
+	./param-restrict -f "$RUN_FUNCTION" -a 5 -l 2 -u 2 $MODEL_NAME.ll
+fi
+if [ "x$RUN_SIM_FUNCTION" != "x" ]; then
+	./param-restrict -f "$RUN_SIM_FUNCTION" -a 5 -l 2 -u 2 $MODEL_NAME.ll
+fi
+
+VARIANT=$(basename "$D")
+if [ "x$VARIANT" == "xconst-input" ]; then
+	# Select response recurrent projection matrix
+	if [ "x$MODEL_NAME" == "xbotvinick_const-input" ]; then
+		RANGE_PARAM="ptr_param_matrix_LinearMatrix Function-3"
+		UPPER=0,-2,-2,0
+		LOWER=0,-5,-5,0
+	else
+		# The selection of these parameters is arbitrary
+		# TODO: Adjust to fit specific experiments
+		RANGE_PARAM=$(grep -o 'raw_[^"]*' "$MODEL_NAME.ll" | sort -u | grep offset | head -n1)
+		UPPER=1
+		LOWER=0
+	fi
+	echo "Selected param: $RANGE_PARAM"
+	./param-restrict -p "$RANGE_PARAM" -l "$LOWER" -u "$UPPER" $MODEL_NAME.ll
+fi
+
+
+# Run optimization passes
+# First try to get rid of alloca-s then inline everything other than PRNGs
+$LLVM_OPT "${MODEL_NAME}.ll" -stats -sroa -mem2reg | $LLVM_OPT -force-attribute="$EXEC_FUNCTION:alwaysinline" -force-attribute="$EXEC_SIM_FUNCTION:alwaysinline" -force-attribute="$RUN_SIM_FUNCTION:alwaysinline"  -force-attribute="__pnl_builtin_mt_rand_normal:noinline" -force-attribute="__pnl_builtin_mt_rand_double:noinline"  -always-inline -inline -O3 -disable-simplify-libcalls -sroa -mem2reg -S -o "${MODEL_NAME}.opt.ll"
+
+$LLVM_OPT "${MODEL_NAME}.opt.ll" -stats --allow-unroll-and-jam --loop-unroll --loop-unroll-and-jam --loop-versioning --enable-unroll-and-jam --partial-unrolling-threshold=999999 --unroll-allow-partial --unroll-allow-peeling --unroll-allow-remainder --unroll-count=5 --unroll-runtime --unroll-remainder --unroll-runtime-multi-exit --enable-npm-unroll-and-jam --unroll-force-peel-count=5 --enable-gvn-memdep --enable-gvn-sink --gvn-hoist-max-bbs=-1 --gvn-hoist-max-chain-length=-1 --gvn-hoist-max-depth=-1 --gvn-max-num-deps=1000000 --gvn-max-recurse-depth=10000000 -O3 -disable-simplify-libcalls -o - | \
+$LLVM_OPT -stats -O3 -disable-simplify-libcalls --enable-gvn-sink --gvn-hoist-max-bbs=-1 --gvn-hoist-max-chain-length=-1 --gvn-hoist-max-depth=-1 --gvn-max-num-deps=1000000 --gvn-max-recurse-depth=10000000 -S -o "${MODEL_NAME}.opt2.ll"
+
+# Scalarize for easier analysis
+$LLVM_OPT --scalarizer --scalarize-load-store -S -O1 -disable-simplify-libcalls "${MODEL_NAME}.opt2.ll"  -o "${MODEL_NAME}.opt2.scalarized.ll"
