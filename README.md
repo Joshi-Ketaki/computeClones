@@ -1,6 +1,6 @@
-## Detect computation clones in two programs.
+# Detect computation clones in two programs.
 
-# Code Clones:
+## Code Clones:
 To improve programmability and find opportunities for computation optimization at the application code level, it is essential to analyze the source code of the application. We look at code clone detection in order to accomplish this. Code clones are computational patterns that are similar or identical. Finding code clones opens up possibilities for scalability, code reuse, and enhanced application understanding
 
 1. Enhanced programmability: When application developers reuse code from libraries that have already been extensively optimized, they save time and effort by not having to rewrite code or investigate optimizations.
