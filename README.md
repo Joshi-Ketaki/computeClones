@@ -8,7 +8,7 @@ To improve programmability and find opportunities for computation optimization a
 
 This is critical for ensuring programmability, improving understanding of newer domain applications and ease of adaptation to emerging applications, especially for domain experts like neuroscientists. To demonstrate this we develop a tool to identify code clones in cognitive models. 
 
-#Availibility of The Tool:
+## Availibility of The Tool:
 [1] This tool was developed as part of work for the following paper: 
 Ján Veselý, Raghavendra Pradyumna Pothukuchi, Ketaki Joshi, Samyak Gupta, Jonathan D. Cohen, and Abhishek Bhattacharjee. 2022. [Distill: domain-specific compilation for cognitive models.](https://dl.acm.org/doi/abs/10.1109/CGO53902.2022.9741278) In Proceedings of the 20th IEEE/ACM International Symposium on Code Generation and Optimization (CGO '22). IEEE Press, 301–312. https://doi.org/10.1109/CGO53902.2022.9741278
 [2] The tool is now a part of [Psyneulink](https://princetonuniversity.github.io/PsyNeuLink/),which is a state-of-art
