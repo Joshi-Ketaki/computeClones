@@ -15,8 +15,19 @@ Compared to existing methods of source-code text based or semantic clone detecti
 # Applications used for Testing:
 Neuroscience research uses cognitive brain modelling to understand and analyze underlying psychological processes for human cognition such as attention allocation, perception dynamics and decision making. These are essentially complex mathematical computations and can be modularized into commonly occurring operations. These are perfect candidates for code clone study as they provide an opportunity to exhibit code reuse as means to simplify understanding of newer cognitive models. The tool we offer for detecting code clones assists in identifying identical operations between models. The models are available in the test directory.
 
-# Running the Tool
+## Building the Tool:
+Dependencies:
+1. Working LLVM compiler build and build system (e.g. 'Make')
+2. 'Cmake'
 
+Run the following command (assuming `Make` is the default build system):
+`cmake .. && make`
+This command will generate and run the build files. An `clone-checker` executable will be created in the project root directory.
+
+##Running the Tool:
+`clone-checker` can be run in the follwing manner:
+`clone-checker` function1 file1.ll function2 file2.ll 
+where file1 is the intermediate representation file that has function1 and file2 is the intermediate representation file that has function2. The files are the intermediate representation dumps as we perform clone detection that is independent of the source language.
 
 ## Availibility of The Tool:
 [1] This tool was developed as part of work for the following paper: 
